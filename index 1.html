@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeeman Effect Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --panel: #0d0d0d;
+    --border: #1a2a3a;
+    --accent: #00aaff;
+    --accent2: #00ffcc;
+    --text: #e0eaff;
+    --muted: #4a6080;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --yellow: #ffff00;
+    --cyan: #00ffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,170,255,0.015) 2px, rgba(0,170,255,0.015) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  header {
+    text-align: center;
+    padding: 18px 20px 10px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,170,255,0.06) 0%, transparent 100%);
+  }
+
+  header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(16px, 2.5vw, 28px);
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 20px rgba(0,170,255,0.5);
+  }
+
+  header p {
+    font-size: clamp(9px, 1.2vw, 12px);
+    color: #66ccff;
+    letter-spacing: 0.15em;
+    margin-top: 4px;
+    opacity: 0.8;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    height: calc(100vh - 80px);
+  }
+
+  /* ── Controls Panel ── */
+  .controls {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .controls::-webkit-scrollbar { width: 4px; }
+  .controls::-webkit-scrollbar-track { background: transparent; }
+  .controls::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+
+  label {
+    font-size: 11px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  select {
+    width: 100%;
+    background: #111;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0l6 8 6-8z' fill='%2300aaff'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+
+  select:focus { border-color: var(--accent); }
+
+  .element-info {
+    font-size: 11px;
+    color: var(--accent);
+    padding: 5px 8px;
+    background: rgba(0,170,255,0.06);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* Slider */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0,170,255,0.6);
+    cursor: pointer;
+  }
+
+  .field-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    min-width: 48px;
+    text-align: right;
+    text-shadow: 0 0 10px rgba(0,170,255,0.4);
+  }
+
+  /* Radio / Checkbox */
+  .radio-group, .check-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .radio-group label, .check-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 11px;
+    margin: 0;
+  }
+
+  input[type=radio], input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  button {
+    flex: 1;
+    padding: 9px 12px;
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    border: 1px solid;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  #runBtn {
+    background: rgba(0,170,0,0.15);
+    color: #00dd00;
+    border-color: #00aa00;
+  }
+
+  #runBtn:hover { background: rgba(0,170,0,0.3); box-shadow: 0 0 12px rgba(0,170,0,0.4); }
+  #runBtn.paused { background: rgba(255,100,0,0.15); color: #ff8800; border-color: #ff6600; }
+  #runBtn.paused:hover { background: rgba(255,100,0,0.3); }
+
+  #resetBtn {
+    background: rgba(255,100,0,0.12);
+    color: #ff9933;
+    border-color: #cc5500;
+    flex: 0 0 auto;
+    padding: 9px 16px;
+  }
+
+  #resetBtn:hover { background: rgba(255,100,0,0.25); }
+
+  /* Equations */
+  .equations {
+    background: rgba(0,255,0,0.04);
+    border: 1px solid rgba(0,255,0,0.15);
+    border-radius: 2px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .equations span {
+    font-size: 10px;
+    color: #00cc66;
+    line-height: 1.5;
+  }
+
+  /* ── Plot area ── */
+  .plots {
+    display: grid;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .plot-wrap {
+    position: relative;
+    border-bottom: 1px solid var(--border);
+    min-height: 0;
+  }
+
+  .plot-wrap:last-child { border-bottom: none; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚛ ZEEMAN EFFECT SIMULATOR</h1>
+  <p>AN INTERACTIVE STUDY OF MAGNETIC FIELD EFFECTS ON ATOMIC SPECTRA</p>
+</header>
+
+<div class="main">
+
+  <!-- Controls -->
+  <aside class="controls">
+
+    <div>
+      <div class="section-title">Element</div>
+      <label for="elementSel">Select element:</label>
+      <select id="elementSel"></select>
+      <div class="element-info" id="elementInfo">—</div>
+    </div>
+
+    <div>
+      <div class="section-title">Magnetic Field</div>
+      <label>Strength (Tesla):</label>
+      <div class="slider-row">
+        <input type="range" id="fieldSlider" min="0" max="10" step="0.1" value="0">
+        <span class="field-val" id="fieldVal">0.0 T</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Zeeman Type</div>
+      <div class="radio-group">
+        <label><input type="radio" name="ztype" value="normal" checked> Normal (¹S → ¹P)</label>
+        <label><input type="radio" name="ztype" value="anomalous"> Anomalous (²S → ²P)</label>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Transition Selection</div>
+      <div class="check-group">
+        <label><input type="checkbox" id="chkSigmaMinus" checked> σ⁻ (Δm = -1, Left circular)</label>
+        <label><input type="checkbox" id="chkPi" checked> π (Δm = 0, Linear)</label>
+        <label><input type="checkbox" id="chkSigmaPlus" checked> σ⁺ (Δm = +1, Right circular)</label>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Animation</div>
+      <div class="btn-row">
+        <button id="runBtn">▶ RUN</button>
+        <button id="resetBtn">⟲ RESET</button>
+      </div>
+      <label style="margin-top:8px;">Speed:</label>
+      <div class="slider-row">
+        <span style="font-size:10px;color:var(--muted)">SLOW</span>
+        <input type="range" id="speedSlider" min="0.01" max="0.5" step="0.01" value="0.1">
+        <span style="font-size:10px;color:var(--muted)">FAST</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Key Equations</div>
+      <div class="equations">
+        <span>ΔE = gⱼ·mⱼ·μB·B</span>
+        <span>Δλ = (λ²/hc)·ΔE</span>
+        <span>μB = 5.788×10⁻⁵ eV/T</span>
+        <span>gⱼ = 1 + [J(J+1)+S(S+1)-L(L+1)] / [2J(J+1)]</span>
+        <span>ΔJ = 0,±1;  Δmⱼ = 0,±1</span>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- Canvases -->
+  <div class="plots">
+    <div class="plot-wrap"><canvas id="c1"></canvas></div>
+    <div class="plot-wrap"><canvas id="c2"></canvas></div>
+    <div class="plot-wrap"><canvas id="c3"></canvas></div>
+  </div>
+</div>
+
+<script>
+// ─── Data ─────────────────────────────────────────────────────────────
+const ELEMENTS = [
+  { value:'hydrogen',  label:'Hydrogen (H)',   symbol:'H',  wavelength:656.3, line:'H-α',   color:'#ef4444' },
+  { value:'helium',    label:'Helium (He)',     symbol:'He', wavelength:587.6, line:'D₃',    color:'#f59e0b' },
+  { value:'sodium',    label:'Sodium (Na)',     symbol:'Na', wavelength:589.3, line:'D-line', color:'#fbbf24' },
+  { value:'mercury',   label:'Mercury (Hg)',    symbol:'Hg', wavelength:546.1, line:'Green',  color:'#22c55e' },
+  { value:'cadmium',   label:'Cadmium (Cd)',    symbol:'Cd', wavelength:643.8, line:'Red',    color:'#dc2626' },
+  { value:'zinc',      label:'Zinc (Zn)',       symbol:'Zn', wavelength:468.0, line:'Blue',   color:'#3b82f6' },
+];
+
+const BOHR = 5.788e-5; // eV/T
+
+// ─── State ────────────────────────────────────────────────────────────
+let B = 0;
+let ztype = 'normal';
+let selectedEl = 'hydrogen';
+let showSigmaMinus = true;
+let showPi = true;
+let showSigmaPlus = true;
+let animSpeed = 0.1;
+let isRunning = false;
+let animDir = 1;
+let animFrame = null;
+
+// ─── DOM ──────────────────────────────────────────────────────────────
+const sel      = document.getElementById('elementSel');
+const elInfo   = document.getElementById('elementInfo');
+const fieldSlider = document.getElementById('fieldSlider');
+const fieldVal = document.getElementById('fieldVal');
+const speedSlider = document.getElementById('speedSlider');
+const runBtn   = document.getElementById('runBtn');
+const resetBtn = document.getElementById('resetBtn');
+const chkSM    = document.getElementById('chkSigmaMinus');
+const chkPi    = document.getElementById('chkPi');
+const chkSP    = document.getElementById('chkSigmaPlus');
+const canvases = [document.getElementById('c1'), document.getElementById('c2'), document.getElementById('c3')];
+const ctxs     = canvases.map(c => c.getContext('2d'));
+
+// ─── Populate select ──────────────────────────────────────────────────
+ELEMENTS.forEach(e => {
+  const o = document.createElement('option');
+  o.value = e.value; o.textContent = e.label;
+  sel.appendChild(o);
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────
+function getCurrentElement() {
+  return ELEMENTS.find(e => e.value === selectedEl);
+}
+
+function getZtype() {
+  return document.querySelector('input[name="ztype"]:checked').value;
+}
+
+function calcEnergySplitting() {
+  const type = getZtype();
+  if (type === 'normal') {
+    const upper = [-1,0,1].map(m => ({ m, shift: m * BOHR * B * 1000, label: m===0?'m = 0':`m = ${m>0?'+':''}${m}` }));
+    const lower = [{ m:0, shift:0, label:'m = 0' }];
+    return { upper, lower };
+  } else {
+    const gU=1.5, gL=1.0;
+    const upper = [-1,0,1].map(m => ({ m, shift: m * gU * BOHR * B * 1000, label: m===0?'mⱼ = 0':`mⱼ = ${m>0?'+':''}${m}`, g:gU }));
+    const lower = [-1,0,1].map(m => ({ m, shift: m * gL * BOHR * B * 1000, label: m===0?'mⱼ = 0':`mⱼ = ${m>0?'+':''}${m}`, g:gL }));
+    return { upper, lower };
+  }
+}
+
+function calcSpectralLines() {
+  const el = getCurrentElement();
+  const λ0 = el.wavelength;
+  const type = getZtype();
+  const lines = [];
+
+  if (type === 'normal') {
+    if (showSigmaMinus) lines.push({ wavelength: λ0 - B*0.05, intensity:0.8, pol:'σ⁻', color:'#3b82f6', transition:'Δm = -1' });
+    if (showPi)         lines.push({ wavelength: λ0,           intensity:1.0, pol:'π',  color:'#22c55e', transition:'Δm = 0' });
+    if (showSigmaPlus)  lines.push({ wavelength: λ0 + B*0.05, intensity:0.8, pol:'σ⁺', color:'#ef4444', transition:'Δm = +1' });
+  } else {
+    const transitions = [
+      { dm:-1, upper:-1, lower: 0, show:showSigmaMinus },
+      { dm:-1, upper: 0, lower: 1, show:showSigmaMinus },
+      { dm: 0, upper:-1, lower:-1, show:showPi },
+      { dm: 0, upper: 0, lower: 0, show:showPi },
+      { dm: 0, upper: 1, lower: 1, show:showPi },
+      { dm: 1, upper: 0, lower:-1, show:showSigmaPlus },
+      { dm: 1, upper: 1, lower: 0, show:showSigmaPlus },
+    ];
+    transitions.forEach(t => {
+      if (!t.show) return;
+      const shift = (t.upper * 1.5 - t.lower * 1.0) * B * 0.03;
+      lines.push({
+        wavelength: λ0 + shift,
+        intensity: 0.7 + Math.random()*0.3,
+        pol: t.dm===0?'π':(t.dm>0?'σ⁺':'σ⁻'),
+        color: t.dm===0?'#22c55e':(t.dm>0?'#ef4444':'#3b82f6'),
+        transition: t.dm===0?'Δm = 0':`Δm = ${t.dm>0?'+':''}${t.dm}`
+      });
+    });
+  }
+  return lines;
+}
+
+// ─── Canvas resize ────────────────────────────────────────────────────
+function resizeCanvases() {
+  canvases.forEach(c => {
+    const rect = c.parentElement.getBoundingClientRect();
+    c.width  = rect.width  * devicePixelRatio;
+    c.height = rect.height * devicePixelRatio;
+    c.style.width  = rect.width  + 'px';
+    c.style.height = rect.height + 'px';
+  });
+}
+
+// ─── Drawing utilities ────────────────────────────────────────────────
+function setupCanvas(ctx) {
+  ctx.save();
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+}
+
+function clear(ctx, c) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, c.clientWidth, c.clientHeight);
+}
+
+function drawGrid(ctx, W, H, px, py, pw, ph) {
+  ctx.strokeStyle = 'rgba(68,68,68,0.4)';
+  ctx.lineWidth = 0.5;
+  const nv = 8, nh = 6;
+  for (let i=0;i<=nv;i++) {
+    const x = px + pw * i/nv;
+    ctx.beginPath(); ctx.moveTo(x,py); ctx.lineTo(x,py+ph); ctx.stroke();
+  }
+  for (let i=0;i<=nh;i++) {
+    const y = py + ph * i/nh;
+    ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px+pw,y); ctx.stroke();
+  }
+}
+
+function drawTitle(ctx, text, W, y) {
+  ctx.font = 'bold 13px "Orbitron", monospace';
+  ctx.fillStyle = '#00aaff';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, W/2, y);
+}
+
+function drawAxisLabel(ctx, text, x, y, angle=0) {
+  ctx.save();
+  ctx.translate(x, y);
+  if (angle) ctx.rotate(angle);
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#e0eaff';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+
+// ─── Plot 1: Energy Level Splitting ───────────────────────────────────
+function plotEnergyLevels() {
+  const ctx = ctxs[0], c = canvases[0];
+  const W = c.clientWidth, H = c.clientHeight;
+  clear(ctx, c);
+
+  const { upper, lower } = calcEnergySplitting();
+  const type = getZtype();
+
+  const pad = { l:70, r:30, t:50, b:30 };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+  const px = pad.l, py = pad.t;
+
+  // Energy range
+  const allShifts = [...upper, ...lower].map(l => l.shift);
+  const maxShift = Math.max(...allShifts.map(Math.abs), 0.001);
+
+  // Map energy → y
+  const toY = e => py + ph/2 - (e / (maxShift * 1.4)) * (ph/2);
+  // Map x-fraction → x
+  const toX = f => px + pw * f;
+
+  // Background
+  ctx.fillStyle = 'rgba(0,170,255,0.02)';
+  ctx.fillRect(px, py, pw, ph);
+
+  drawGrid(ctx, W, H, px, py, pw, ph);
+  drawTitle(ctx, `Zeeman Energy Level Splitting — ${type==='normal'?'¹S → ¹P':'²S → ²P'} Transition`, W, 32);
+
+  // Y axis
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px,py+ph); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px,py+ph); ctx.lineTo(px+pw,py+ph); ctx.stroke();
+  drawAxisLabel(ctx, 'Energy Shift (meV)', 16, py+ph/2, -Math.PI/2);
+
+  // Zero line
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.setLineDash([4,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(px, toY(0)); ctx.lineTo(px+pw, toY(0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const xB0 = 0.2, xBn = 0.65, lw = 0.12;
+  const upperSplits = upper.length > 1;
+  const lowerSplits = lower.length > 1;
+
+  // Draw upper B=0
+  const uBefore = upper[0].shift;
+  if (!upperSplits || B===0) {
+    ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(toX(xB0-lw/2), toY(uBefore)); ctx.lineTo(toX(xB0+lw/2), toY(uBefore)); ctx.stroke();
+    ctx.fillStyle = '#00ffff'; ctx.font = 'bold 11px "Share Tech Mono"'; ctx.textAlign='right';
+    ctx.fillText('Upper', toX(xB0-lw/2-0.02), toY(uBefore)-6);
+    ctx.fillText('State', toX(xB0-lw/2-0.02), toY(uBefore)+10);
+  }
+
+  // Draw lower B=0
+  const lBefore = lower[0].shift;
+  if (!lowerSplits || B===0) {
+    ctx.strokeStyle = 'orange'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(toX(xB0-lw/2), toY(lBefore)); ctx.lineTo(toX(xB0+lw/2), toY(lBefore)); ctx.stroke();
+    ctx.fillStyle = 'orange'; ctx.font = 'bold 11px "Share Tech Mono"'; ctx.textAlign='right';
+    ctx.fillText('Lower', toX(xB0-lw/2-0.02), toY(lBefore)-6);
+    ctx.fillText('State', toX(xB0-lw/2-0.02), toY(lBefore)+10);
+  }
+
+  if (B > 0) {
+    // Draw upper split
+    upper.forEach(lev => {
+      const e = lev.shift;
+      ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(toX(xBn-lw/2), toY(e)); ctx.lineTo(toX(xBn+lw/2), toY(e)); ctx.stroke();
+      ctx.fillStyle='#00ffff'; ctx.textAlign='left'; ctx.font='bold 9px "Share Tech Mono"';
+      ctx.fillText(lev.label, toX(xBn+lw/2+0.01), toY(e)+4);
+      ctx.fillStyle='rgba(0,255,255,0.6)'; ctx.font='8px "Share Tech Mono"';
+      ctx.fillText(`${e.toFixed(3)} meV`, toX(xBn+lw/2+0.08), toY(e)+4);
+      if (upperSplits) {
+        ctx.strokeStyle='rgba(0,255,255,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(toX(xB0+lw/2), toY(uBefore)); ctx.lineTo(toX(xBn-lw/2), toY(e)); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    });
+
+    // Draw lower split
+    lower.forEach(lev => {
+      const e = lev.shift;
+      ctx.strokeStyle = 'orange'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(toX(xBn-lw/2), toY(e)); ctx.lineTo(toX(xBn+lw/2), toY(e)); ctx.stroke();
+      ctx.fillStyle='orange'; ctx.textAlign='left'; ctx.font='bold 9px "Share Tech Mono"';
+      ctx.fillText(lev.label, toX(xBn+lw/2+0.01), toY(e)+4);
+      ctx.fillStyle='rgba(255,165,0,0.6)'; ctx.font='8px "Share Tech Mono"';
+      ctx.fillText(`${e.toFixed(3)} meV`, toX(xBn+lw/2+0.08), toY(e)+4);
+      if (lowerSplits) {
+        ctx.strokeStyle='rgba(255,165,0,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(toX(xB0+lw/2), toY(lBefore)); ctx.lineTo(toX(xBn-lw/2), toY(e)); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    });
+
+    // Draw transitions
+    upper.forEach(u => {
+      lower.forEach(l => {
+        const dm = u.m - l.m;
+        if (Math.abs(dm) > 1) return;
+        let show=false, col='#22c55e';
+        if (dm===-1 && showSigmaMinus) { show=true; col='#3b82f6'; }
+        else if (dm===0 && showPi)      { show=true; col='#22c55e'; }
+        else if (dm===1 && showSigmaPlus){ show=true; col='#ef4444'; }
+        if (!show) return;
+
+        const x1=toX(xBn+lw/2+0.01), y1=toY(u.shift), x2=toX(xBn+lw/2+0.01), y2=toY(l.shift);
+        ctx.strokeStyle=col; ctx.lineWidth=2; ctx.globalAlpha=0.6;
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+        // Arrowhead
+        const ah=8;
+        ctx.beginPath();
+        ctx.moveTo(x2,y2);
+        ctx.lineTo(x2-4,y2-ah);
+        ctx.lineTo(x2+4,y2-ah);
+        ctx.closePath(); ctx.fillStyle=col; ctx.fill();
+        ctx.globalAlpha=1;
+      });
+    });
+
+    // B labels
+    ctx.font='11px "Share Tech Mono"'; ctx.textAlign='center'; ctx.fillStyle='white';
+    ctx.fillRect(toX(xB0)-22, py-22, 44, 16);
+    ctx.fillStyle='#000'; ctx.fillText('B = 0', toX(xB0), py-10);
+    ctx.fillStyle='#00aaff';
+    ctx.fillRect(toX(xBn)-40, py-22, 80, 16);
+    ctx.fillStyle='#000'; ctx.fillText(`B = ${B.toFixed(1)} T`, toX(xBn), py-10);
+  }
+
+  // Legend
+  const leg = [];
+  if (showSigmaMinus) leg.push({col:'#3b82f6', lbl:'σ⁻ (Δm=-1)'});
+  if (showPi)         leg.push({col:'#22c55e', lbl:'π (Δm=0)'});
+  if (showSigmaPlus)  leg.push({col:'#ef4444', lbl:'σ⁺ (Δm=+1)'});
+  if (B>0 && leg.length) {
+    let lx=px+8, ly=py+ph-10;
+    leg.forEach((l,i) => {
+      ctx.fillStyle=l.col; ctx.fillRect(lx+i*110, ly-8, 10, 10);
+      ctx.fillStyle=l.col; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='left';
+      ctx.fillText(l.lbl, lx+i*110+13, ly);
+    });
+  }
+
+  // Info box
+  const ilines = [`Type: ${type}`, B>0?`Levels: ${upper.length}u + ${lower.length}l`:'No field applied'];
+  if (B>0 && maxShift>0) ilines.push(`±${maxShift.toFixed(3)} meV`);
+  ctx.fillStyle='rgba(26,26,26,0.85)';
+  ctx.fillRect(px+4, py+4, 160, ilines.length*16+8);
+  ctx.strokeStyle='rgba(0,170,255,0.4)'; ctx.lineWidth=1;
+  ctx.strokeRect(px+4, py+4, 160, ilines.length*16+8);
+  ilines.forEach((s,i) => {
+    ctx.font='9px "Share Tech Mono"'; ctx.fillStyle='#ffff00'; ctx.textAlign='left';
+    ctx.fillText(s, px+10, py+16+i*16);
+  });
+}
+
+// ─── Plot 2: Spectrum ─────────────────────────────────────────────────
+function plotSpectrum() {
+  const ctx = ctxs[1], c = canvases[1];
+  const W = c.clientWidth, H = c.clientHeight;
+  clear(ctx, c);
+
+  const el = getCurrentElement();
+  const lines = calcSpectralLines();
+  const λ0 = el.wavelength;
+
+  const pad = { l:60, r:20, t:50, b:40 };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+  const px = pad.l, py = pad.t;
+
+  // Wavelength range
+  let λmin, λmax;
+  if (lines.length) {
+    const wls = lines.map(l=>l.wavelength).concat([λ0]);
+    λmin = Math.min(...wls) - 0.5;
+    λmax = Math.max(...wls) + 0.5;
+  } else {
+    λmin = λ0 - 3; λmax = λ0 + 3;
+  }
+
+  const toX = λ => px + (λ-λmin)/(λmax-λmin) * pw;
+  const toY = v => py + ph*(1-v);
+
+  ctx.fillStyle='rgba(0,170,255,0.015)';
+  ctx.fillRect(px, py, pw, ph);
+  drawGrid(ctx, W, H, px, py, pw, ph);
+
+  drawTitle(ctx, `Emission Spectrum — ${el.symbol} ${el.line} (${λ0} nm)`, W, 32);
+  drawAxisLabel(ctx, 'Wavelength (nm)', px+pw/2, py+ph+32);
+  drawAxisLabel(ctx, 'Intensity', 16, py+ph/2, -Math.PI/2);
+
+  // X axis ticks
+  const nTicks = 6;
+  for (let i=0;i<=nTicks;i++) {
+    const λ = λmin + (λmax-λmin)*i/nTicks;
+    const x = toX(λ);
+    ctx.strokeStyle='#444'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,py+ph); ctx.lineTo(x,py+ph+5); ctx.stroke();
+    ctx.fillStyle='#888'; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='center';
+    ctx.fillText(λ.toFixed(2), x, py+ph+18);
+  }
+
+  // Base line
+  ctx.strokeStyle='rgba(102,102,102,0.6)'; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(toX(λ0),py); ctx.lineTo(toX(λ0),py+ph); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Spectral lines + Gaussian
+  lines.forEach(line => {
+    const x = toX(line.wavelength);
+    const yTop = toY(line.intensity);
+
+    ctx.strokeStyle = line.color; ctx.lineWidth = 3; ctx.globalAlpha=0.9;
+    ctx.beginPath(); ctx.moveTo(x,py+ph); ctx.lineTo(x,yTop); ctx.stroke();
+    ctx.globalAlpha=1;
+
+    // Gaussian fill
+    const pts = 80;
+    ctx.beginPath();
+    for (let i=0;i<=pts;i++) {
+      const λi = line.wavelength - 0.15 + 0.3*i/pts;
+      const yi = line.intensity * Math.exp(-Math.pow((λi-line.wavelength)/0.04,2));
+      const xi = toX(λi), yyi = toY(yi);
+      i===0 ? ctx.moveTo(xi,py+ph) : ctx.lineTo(xi,yyi);
+    }
+    ctx.lineTo(toX(line.wavelength+0.15),py+ph);
+    ctx.closePath();
+    ctx.fillStyle = line.color; ctx.globalAlpha=0.3; ctx.fill(); ctx.globalAlpha=1;
+
+    // Label
+    ctx.fillStyle=line.color; ctx.font='bold 9px "Share Tech Mono"'; ctx.textAlign='center';
+    ctx.fillText(line.wavelength.toFixed(2), x, Math.max(yTop-6, py+4));
+  });
+
+  // Legend
+  const groups = {};
+  lines.forEach(l => { groups[l.pol] = groups[l.pol]||{col:l.col,cnt:0}; groups[l.pol].cnt++; });
+  let lx=px+pw-8, ly=py+8;
+  Object.entries(groups).forEach(([pol,g],i) => {
+    ctx.fillStyle='rgba(26,26,26,0.85)';
+    ctx.fillRect(lx-130, ly+i*18-12, 128, 16);
+    ctx.fillStyle=g.col; ctx.fillRect(lx-130+4, ly+i*18-8, 10, 10);
+    ctx.font='9px "Share Tech Mono"'; ctx.textAlign='left';
+    ctx.fillText(`${pol} (${g.cnt} line${g.cnt>1?'s':''})`, lx-112, ly+i*18+1);
+  });
+
+  // Info box
+  if (lines.length>1) {
+    const wls = lines.map(l=>l.wavelength);
+    const spread = (Math.max(...wls)-Math.min(...wls)).toFixed(3);
+    ctx.fillStyle='rgba(26,26,26,0.85)';
+    ctx.fillRect(px+4,py+4,180,48);
+    ctx.strokeStyle='rgba(0,170,255,0.4)'; ctx.lineWidth=1; ctx.strokeRect(px+4,py+4,180,48);
+    ctx.fillStyle='#ffff00'; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='left';
+    ctx.fillText(`B = ${B.toFixed(1)} T`, px+10, py+18);
+    ctx.fillText(`Total Δλ = ${spread} nm`, px+10, py+30);
+    ctx.fillText(`${lines.length} lines`, px+10, py+42);
+  }
+}
+
+// ─── Plot 3: Energy vs Field ──────────────────────────────────────────
+function plotEnergyVsField() {
+  const ctx = ctxs[2], c = canvases[2];
+  const W = c.clientWidth, H = c.clientHeight;
+  clear(ctx, c);
+
+  const type = getZtype();
+  const pad = { l:65, r:20, t:50, b:42 };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+  const px = pad.l, py = pad.t;
+
+  const N = 100;
+  const Bs = Array.from({length:N}, (_,i)=>i*10/(N-1));
+  const muB = BOHR;
+
+  let series = [];
+  if (type==='normal') {
+    series = [
+      { label:'Upper: m=-1', col:'#00ffff', dash:[6,3], vals: Bs.map(b=>-1*muB*b*1000) },
+      { label:'Upper: m=0',  col:'#00ffff', dash:[],    vals: Bs.map(()=>0) },
+      { label:'Upper: m=+1', col:'#00ffff', dash:[6,3], vals: Bs.map(b=>1*muB*b*1000) },
+      { label:'Lower: m=0',  col:'orange',  dash:[],    vals: Bs.map(()=>0) },
+    ];
+  } else {
+    const gU=1.5,gL=1.0;
+    series = [
+      { label:'Upper: mⱼ=-1', col:'#00ffff', dash:[6,3], vals:Bs.map(b=>-1*gU*muB*b*1000) },
+      { label:'Upper: mⱼ=0',  col:'#00ffff', dash:[],    vals:Bs.map(()=>0) },
+      { label:'Upper: mⱼ=+1', col:'#00ffff', dash:[6,3], vals:Bs.map(b=>1*gU*muB*b*1000) },
+      { label:'Lower: mⱼ=-1', col:'orange',  dash:[6,3], vals:Bs.map(b=>-1*gL*muB*b*1000) },
+      { label:'Lower: mⱼ=0',  col:'orange',  dash:[],    vals:Bs.map(()=>0) },
+      { label:'Lower: mⱼ=+1', col:'orange',  dash:[6,3], vals:Bs.map(b=>1*gL*muB*b*1000) },
+    ];
+  }
+
+  const allVals = series.flatMap(s=>s.vals);
+  const ymin = Math.min(...allVals)-0.01, ymax = Math.max(...allVals)+0.01;
+
+  const toX = b => px + b/10 * pw;
+  const toY = v => py + ph - (v-ymin)/(ymax-ymin)*ph;
+
+  ctx.fillStyle='rgba(0,170,255,0.015)'; ctx.fillRect(px,py,pw,ph);
+  drawGrid(ctx, W, H, px, py, pw, ph);
+  drawTitle(ctx, 'Energy Level Splitting vs. Magnetic Field Strength', W, 32);
+  drawAxisLabel(ctx, 'Magnetic Field Strength (Tesla)', px+pw/2, py+ph+34);
+  drawAxisLabel(ctx, 'Energy Shift (meV)', 16, py+ph/2, -Math.PI/2);
+
+  // X ticks
+  for (let i=0;i<=5;i++) {
+    const bv=i*2, x=toX(bv);
+    ctx.strokeStyle='#444'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x,py+ph); ctx.lineTo(x,py+ph+5); ctx.stroke();
+    ctx.fillStyle='#888'; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='center';
+    ctx.fillText(bv, x, py+ph+18);
+  }
+
+  // Y ticks
+  for (let i=0;i<=4;i++) {
+    const v=ymin+(ymax-ymin)*i/4, y=toY(v);
+    ctx.strokeStyle='#444'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(px,y); ctx.lineTo(px-5,y); ctx.stroke();
+    ctx.fillStyle='#888'; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='right';
+    ctx.fillText(v.toFixed(2), px-8, y+4);
+  }
+
+  // Zero line
+  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(px,toY(0)); ctx.lineTo(px+pw,toY(0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Series lines
+  series.forEach(s => {
+    ctx.strokeStyle=s.col; ctx.lineWidth=2.5;
+    if (s.dash.length) ctx.setLineDash(s.dash);
+    ctx.beginPath();
+    Bs.forEach((b,i) => { i===0?ctx.moveTo(toX(b),toY(s.vals[i])):ctx.lineTo(toX(b),toY(s.vals[i])); });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Current B marker
+  ctx.strokeStyle='#ff00ff'; ctx.lineWidth=2.5;
+  ctx.setLineDash([6,3]);
+  ctx.beginPath(); ctx.moveTo(toX(B),py); ctx.lineTo(toX(B),py+ph); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#ff00ff'; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='center';
+  ctx.fillText(`B = ${B.toFixed(1)} T`, toX(B), py-4);
+
+  // Mini legend
+  const uniq = [...new Set(series.map(s=>s.label.split(':')[0]))];
+  const cols = { 'Upper':'#00ffff', 'Lower':'orange' };
+  let lx=px+8, ly=py+8;
+  uniq.forEach((u,i) => {
+    ctx.fillStyle='rgba(20,20,20,0.8)'; ctx.fillRect(lx+i*120, ly-10, 115, 16);
+    ctx.fillStyle=cols[u]||'#fff'; ctx.fillRect(lx+i*120+4, ly-6, 12, 8);
+    ctx.font='9px "Share Tech Mono"'; ctx.textAlign='left'; ctx.fillStyle=cols[u]||'#fff';
+    ctx.fillText(u+' states', lx+i*120+20, ly+2);
+  });
+
+  // Info annotation
+  ctx.fillStyle='rgba(26,26,26,0.85)';
+  ctx.fillRect(px+pw-160, py+4, 155, 22);
+  ctx.fillStyle='#ffff00'; ctx.font='10px "Share Tech Mono"'; ctx.textAlign='left';
+  ctx.fillText(`Type: ${type.charAt(0).toUpperCase()+type.slice(1)}`, px+pw-154, py+18);
+}
+
+// ─── Update all ───────────────────────────────────────────────────────
+function updateAll() {
+  fieldVal.textContent = `${B.toFixed(1)} T`;
+  const el = getCurrentElement();
+  elInfo.textContent = `${el.symbol} — ${el.wavelength} nm • ${el.line}`;
+  plotEnergyLevels();
+  plotSpectrum();
+  plotEnergyVsField();
+}
+
+// ─── Animation ────────────────────────────────────────────────────────
+function animate() {
+  if (!isRunning) return;
+  B += animSpeed * animDir;
+  if (B >= 10) { B = 10; animDir = -1; }
+  else if (B <= 0) { B = 0; animDir = 1; }
+  fieldSlider.value = B;
+  updateAll();
+  animFrame = setTimeout(animate, 50);
+}
+
+function toggleAnim() {
+  isRunning = !isRunning;
+  if (isRunning) {
+    runBtn.textContent = '⏸ PAUSE';
+    runBtn.classList.add('paused');
+    animate();
+  } else {
+    runBtn.textContent = '▶ RUN';
+    runBtn.classList.remove('paused');
+    clearTimeout(animFrame);
+  }
+}
+
+function resetSim() {
+  isRunning = false;
+  runBtn.textContent = '▶ RUN';
+  runBtn.classList.remove('paused');
+  clearTimeout(animFrame);
+  B = 0; animDir = 1;
+  fieldSlider.value = 0;
+  updateAll();
+}
+
+// ─── Events ───────────────────────────────────────────────────────────
+sel.addEventListener('change', () => { selectedEl = sel.value; updateAll(); });
+fieldSlider.addEventListener('input', () => { B = parseFloat(fieldSlider.value); updateAll(); });
+speedSlider.addEventListener('input', () => { animSpeed = parseFloat(speedSlider.value); });
+document.querySelectorAll('input[name="ztype"]').forEach(r => r.addEventListener('change', updateAll));
+chkSM.addEventListener('change', () => { showSigmaMinus = chkSM.checked; updateAll(); });
+chkPi.addEventListener('change', () => { showPi = chkPi.checked; updateAll(); });
+chkSP.addEventListener('change', () => { showSigmaPlus = chkSP.checked; updateAll(); });
+runBtn.addEventListener('click', toggleAnim);
+resetBtn.addEventListener('click', resetSim);
+
+// ─── Init ─────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => { resizeCanvases(); updateAll(); });
+resizeCanvases();
+updateAll();
+</script>
+</body>
+</html>
